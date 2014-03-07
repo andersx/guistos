@@ -1,0 +1,167 @@
+
+############################################################
+#                 PHAISTOS v1.0-rc1 (rev. 324)             #
+#    A Markov Chain Monte Carlo Simulation Framework       #
+#                                                          #
+#  Please cite:                                            #
+#    Boomsma, Frellsen, Harder, Bottaro, Johansson, Tian   #
+#    Stovgaard, Andreetta, Olsson, Valentin, Christensen,  #
+#    Borg, Ferkinghoff-Borg, Hamelryck. submitted.         #
+#                                                          #
+############################################################
+
+###################### guistos OPTIONS ######################
+#                                                          #
+#           This file was created using guistos.            #
+#           Report bugs to andersx@nano.ku.dk              #
+#                                                          #
+############################################################
+
+######################
+#### MAIN OPTIONS ####
+######################
+
+### General options ###
+seed = 122
+output-directory = /home/andersx/folds/1pgb_test
+procedure-fold = 1
+
+### Starting structure options ###
+pdb-file = /home/andersx/guistos/1PGB.pdb
+init-from-pdb = True
+
+
+#############################
+#### MONTE CARLO OPTIONS ####
+#############################
+
+### General Monte Carlo options ###
+iterations = 240000000
+threads = 24
+procedure-fold-pdb-dump-interval = 10000
+
+monte-carlo-metropolis-hastings = 1
+temperature = 300 
+
+
+########################
+#### ENERGY OPTIONS ####
+########################
+
+energy-clash-fast = 1
+
+energy-opls-angle-bend-cached = 1
+energy-opls-angle-bend-cached-weight = 1.67738861859
+energy-opls-torsion = 1
+energy-opls-torsion-weight = 1.67738861859
+energy-opls-bond-stretch = 1
+energy-opls-bond-stretch-weight = 1.67738861859
+energy-opls-non-bonded-cached = 1
+energy-opls-non-bonded-cached-weight = 1.67738861859
+
+energy-camshift-cached = 1
+energy-camshift-cached-star-filename = /home/andersx/guistos/1PGB.str
+energy-camshift-cached-weight = 1.67738861859
+
+
+######################
+#### MOVE OPTIONS ####
+######################
+
+### semilocal ###
+move-semilocal = 1
+move-semilocal-debug = 0
+move-semilocal-weight = 0.05
+move-semilocal-move-length-min = 4
+move-semilocal-move-length-max = 4
+move-semilocal-regions = [(-2147483648,2147483647)]
+move-semilocal-only-internal-moves = false
+move-semilocal-sample-omega = false
+move-semilocal-sample-bond-angle = false
+move-semilocal-constraint-a = 300
+move-semilocal-constraint-b = 10
+move-semilocal-omega-scaling = 8
+move-semilocal-bond-angle-scaling = 8
+move-semilocal-skip-proline-phi = false
+
+### CRISP ### 
+move-crisp = 1
+move-crisp-debug = 0
+move-crisp-weight = 0.15
+move-crisp-move-length-min = 5
+move-crisp-move-length-max = 5
+move-crisp-regions = [(-2147483648,2147483647)]
+move-crisp-std-dev-bond-angle = 0.5
+move-crisp-std-dev-phi-psi = 4
+move-crisp-std-dev-omega = 0.5
+move-crisp-only-internal-moves = false
+move-crisp-sample-omega = false
+
+### DBN ###
+move-backbone-dbn = 1
+move-backbone-dbn-debug = 0
+move-backbone-dbn-weight = 0.05
+move-backbone-dbn-move-length-min = 1
+move-backbone-dbn-move-length-max = 7
+move-backbone-dbn-regions = [(-2147483648,2147483647)]
+move-backbone-dbn-resample-mode = resample-all
+move-backbone-dbn-implicit-energy = True
+move-backbone-dbn-dbn-consistency-window-size = 10
+move-backbone-dbn-dbn-bias-window-size = 10
+backbone-dbn-torus-initial-pdb-file = /home/andersx/guistos/1PGB.pdb
+
+### Sidechain move Basilisk ###
+move-sidechain-basilisk = 1
+move-sidechain-basilisk-debug = 0
+move-sidechain-basilisk-weight = 0.25
+move-sidechain-basilisk-move-length-min = 1
+move-sidechain-basilisk-move-length-max = 1
+move-sidechain-basilisk-regions = [(-2147483648,2147483647)]
+move-sidechain-basilisk-model-filename = "basilisk.dbn"
+move-sidechain-basilisk-ignore-bb = false
+move-sidechain-basilisk-reject-broken-prolines = true
+move-sidechain-basilisk-sample-hydrogen-chis = false
+move-sidechain-basilisk-sample-hydrogen-chis-normal = true
+move-sidechain-basilisk-sample-hydrogen-chis-sigma = 0.0035
+move-sidechain-basilisk-implicit-energy = True
+move-sidechain-basilisk-mocapy-dbn-dir = /home/andersx/phaistos_stable/phaistos_324/build/data/mocapy_dbns
+
+## Sidechain move - Basilisk local ###
+move-sidechain-basilisk-local = 1
+move-sidechain-basilisk-local-debug = 0
+move-sidechain-basilisk-local-weight = 0.25
+move-sidechain-basilisk-local-move-length-min = 1
+move-sidechain-basilisk-local-move-length-max = 1
+move-sidechain-basilisk-local-regions = [(-2147483648,2147483647)]
+move-sidechain-basilisk-local-model-filename = "basilisk.dbn"
+move-sidechain-basilisk-local-implicit-energy = True
+move-sidechain-basilisk-local-mocapy-dbn-dir = /home/andersx/phaistos_stable/phaistos_324/build/data/mocapy_dbns
+
+### Local sidechain move ###
+move-sidechain-local = 2
+move-sidechain-local-debug = 0
+move-sidechain-local-weight = 0.125
+move-sidechain-local-move-length-min = 1
+move-sidechain-local-move-length-max = 1
+move-sidechain-local-regions = [(-2147483648,2147483647)]
+move-sidechain-local-sigma-major-dofs = 0.1
+move-sidechain-local-sigma-minor-dofs = 0.00349066
+move-sidechain-local-sample-major-dofs = true
+move-sidechain-local-sample-minor-dofs = true
+move-sidechain-local-mode = constrain-one-endpoint
+move-sidechain-local-lagrange-multiplier = 200
+move-sidechain-local-skip-proline = false
+move-sidechain-local-1-debug = 0
+move-sidechain-local-1-weight = 0.125
+move-sidechain-local-1-move-length-min = 1
+move-sidechain-local-1-move-length-max = 1
+move-sidechain-local-1-regions = [(-2147483648,2147483647)]
+move-sidechain-local-1-sigma-major-dofs = 0.1
+move-sidechain-local-1-sigma-minor-dofs = 0.00349066
+move-sidechain-local-1-sample-major-dofs = true
+move-sidechain-local-1-sample-minor-dofs = true
+move-sidechain-local-1-mode = constrain-one-endpoint
+move-sidechain-local-1-lagrange-multiplier = 500000
+move-sidechain-local-1-skip-proline = false
+
+################### PHAISTOS OPTIONS END ###################

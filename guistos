@@ -1,0 +1,451 @@
+#!/usr/bin/python
+title = "Guistos 0.1rc beta- a Phaistos GUI"
+
+import sys
+import time
+import os
+import Tkinter as tk
+import tkFileDialog
+import tkMessageBox
+import Pmw
+import guistos_utils
+import copy
+from PIL import ImageTk, Image
+
+
+class PhaistosApp(tk.Tk):
+    def __init__(self, *args, **kwargs):
+	self.settings = copy.deepcopy(guistos_utils.guistos_default_settings)
+	## Initialize 
+        tk.Tk.__init__(self, *args, **kwargs)
+        self.geometry("600x900+1500+200")
+        self.om_variable = tk.StringVar(self)
+	self.title("Guistos - a Phaistos GUI")
+
+	# Create "Notebook" for tabs
+        notebook = Pmw.NoteBook()
+        notebook.pack(fill = 'both', expand = 1, padx = 10, pady = 10)
+
+        # Create the "Simulation Options" tab.
+        page = notebook.add('Simulation Options')
+        notebook.tab('Simulation Options').focus_set()
+
+
+        # Create the "General Options" field
+        group_go = Pmw.Group(page, tag_text = 'General Options')
+        group_go.pack(fill = 'both', expand = 1, padx = 10, pady = 10)
+
+	# Create grid for General Options/contents
+        frame_go = tk.Frame(group_go.interior())
+        frame_go.pack(fill = 'both', expand = 1)
+
+        frame_go.grid_rowconfigure(2, weight=1)
+        frame_go.grid_columnconfigure(2, weight=1)
+
+	# Create General Options/contents
+        self.input_structure = Pmw.EntryField(frame_go, labelpos = 'nw', label_text = 'Start from AA-/PDB-file:', modifiedcommand = self.set_input_structure)
+        self.input_structure.setvalue(self.settings["input-file"])
+        self.open_button     = tk.Button(frame_go, text = 'Open ...', command = self.open_pdb_button)
+        self.sim_title       = Pmw.EntryField(frame_go, labelpos = 'nw', label_text = 'Short Title:', entry_width = 15, modifiedcommand = self.set_title)
+        self.sim_title.setvalue(self.settings["title"])
+
+        # Make the checkbox and boolean tk-variable
+        self.settings["init-from-pdb-py-var"] = tk.BooleanVar()
+        self.init_from_pdb   = tk.Checkbutton(frame_go, text = 'Initialize from PDB structure', command = self.set_init_from_pdb, variable = self.settings["init-from-pdb-py-var"], state = tk.DISABLED)
+
+        self.input_iterations = Pmw.EntryField(frame_go, labelpos = 'nw', label_text = 'Iterations (per thread):', modifiedcommand = self.set_iterations)
+        self.input_threads = Pmw.EntryField(frame_go, labelpos = 'nw', label_text = 'Parallel threads:', modifiedcommand = self.set_threads, entry_width = 1)
+
+        # Invoke default values for iterations-per-thread and threads
+        self.input_iterations.setvalue(self.settings["iterations-per-thread"])
+        self.input_threads.setvalue(self.settings["threads"])
+
+        # Put evertyhing in the grid
+        self.input_structure.grid(column=0, columnspan=3, row=0, padx = 10, pady = 10, sticky = 'nsew')
+        self.init_from_pdb.grid(row = 1, column = 2, padx = 10, pady = 10, sticky = 'nsew')
+        self.sim_title.grid(column=0, row=1, padx = 10, pady = 10, sticky = 'nsew')
+        self.open_button.grid(column=3, row=0, padx = 10, pady = 10, sticky = 'nsew')
+        self.input_iterations.grid(row = 2, column = 0, padx = 10, pady = 10, sticky = 'nsew')
+        self.input_threads.grid(row = 2, column = 2, padx = 10, pady = 10, sticky = 'ws')
+
+
+        # Create the "Energy Options" field
+        self.group_eo = Pmw.Group(page, tag_text = 'Energy Options')
+	self.group_eo_inner = Pmw.Group(self.group_eo.interior(), tag_text = 'Spectroscopic Data')
+	self.group_eo_inner.pack(side = 'right', padx = 10, pady = 10)
+
+        # Create Dropdown Menu + Datafile Entry for auxilary energy funtion
+        self.spec_menu = Pmw.OptionMenu (self.group_eo_inner.interior(), labelpos = 'nw', label_text = 'Model:', items = ('None', 'CamShift 1.35', 'ProCS'), menubutton_width = 20, command = self.set_spec, menubutton_direction = 'below')
+        
+        self.data_file = Pmw.EntryField(self.group_eo_inner.interior(), labelpos = 'nw', label_text = 'Data File:', entry_width=30, modifiedcommand = self.set_spec_data_file)
+        self.open_button_eo  = tk.Button(self.group_eo_inner.interior(), text = 'Open ...', command = self.open_data_button_eo)
+
+        self.spec_menu.pack(padx = 10, pady = 10, side = 'top')
+        self.spec_menu.invoke(self.settings['spectroscopy'])
+
+        self.data_file.pack(fill = 'x', padx = 10, pady = 10, side ='left')
+        self.open_button_eo.pack(fill = 'x', padx = 10, pady = 10, side = 'left')
+
+        # Create Radiobuttons for molecular mechanics Force Field
+        radiobuttons = Pmw.RadioSelect(self.group_eo.interior(), buttontype = 'radiobutton', orient = 'vertical', labelpos = 'nw', command = self.select_forcefield, label_text = 'Molecular Mechanics\nForce Field:')
+        radiobuttons.pack(side = 'left', expand = 1, padx = 10, pady = 10)
+        for text in ('OPLS-AA/L', 'PROFASI'):
+            radiobuttons.add(text)
+        radiobuttons.invoke('OPLS-AA/L')
+        self.group_eo.pack(fill = 'both', expand = 1, padx = 10, pady = 10)
+
+
+        # Create the "Monte Carlo Options" field
+        self.groupmc = Pmw.Group(page, tag_text = 'Monte Carlo Options:')
+        self.groupmc.pack(fill = 'both', expand = 1, padx = 10, pady = 10)
+
+        # Create the MC Type buttons
+        home = Pmw.RadioSelect(self.groupmc.interior(), orient = 'vertical', command = self.set_mc)
+        for text in ('Metropolis-Hastings', 'Muninn', 'Simulated Annealing', 'Greedy Optimization'):
+            home.add(text)
+        home.pack(padx = 10, pady = 10, side = 'left')
+
+        # Variable to contain Radio Selections (aka "fields")
+	self.mc_fields = []
+	home.invoke('Metropolis-Hastings')
+
+
+        # Create the "Move Options" field.
+        self.group_mo = Pmw.Group(page, tag_text = 'Monte Carlo Move Sets')
+        self.group_mo.pack(fill = 'both', expand = 1, padx = 10, pady = 10)
+
+        # Create Dropdown Menus for MC Move Selection
+        self.bb_menu = Pmw.OptionMenu (self.group_mo.interior(), labelpos = 'nw', label_text = 'Backbone Moves:', items = ('small', 'medium', 'large'), menubutton_width = 10, command = self.set_bb_moves, menubutton_direction = 'below',initialitem='small')
+        self.sc_menu = Pmw.OptionMenu (self.group_mo.interior(), labelpos = 'nw', label_text = 'Side Chain Moves:', items = ('small', 'medium', 'large'), menubutton_width = 10, command = self.set_sc_moves, menubutton_direction = 'below')
+
+	# Create Radio Buttons for Implicit Energy/bias
+        radiobuttons_bias = Pmw.RadioSelect(self.group_mo.interior(), buttontype = 'radiobutton', orient = 'vertical', labelpos = 'w', command = self.set_implicit_energy, label_text = 'Compensate for\nmove bias:')
+
+        # Add some buttons to the radiobutton RadioSelect.
+        for text in ('No', 'Yes'):
+            radiobuttons_bias.add(text)
+        radiobuttons_bias.invoke('No')
+
+        radiobuttons_bias.pack(side = 'right', expand = 1, padx = 10, pady = 10)
+        self.bb_menu.pack(anchor = 'w', padx = 10, pady = 10, side = 'left')
+        self.sc_menu.pack(anchor = 'w', padx = 10, pady = 10, side = 'left')
+
+	self.bb_menu.invoke(self.settings['bb-moves'])
+	self.sc_menu.invoke(self.settings['sc-moves'])
+
+	# Add Some More Tabs
+        page = notebook.add('About')
+#        print guistos_utils.DEFAULT_OUT_DIR
+#        print GUISTOS_ROOT_DIR + "/Phaistos.png"
+
+	image = Image.open(guistos_utils.GUISTOS_ROOT_DIR + "/Phaistos.png")
+	photo = ImageTk.PhotoImage(image)
+        label = tk.Label(page,image=photo,width=400)
+        label.image = photo
+        label.pack(padx = 10, pady = 20)
+
+        text_citation = """Guistos - a PHAISTOS GUI
+
+Written by Anders Steen Christensen 
+Email: andersx@nano.ku.dk
+
+Blog: http://combichem.blogspot.com/
+
+Copyright (c) 2012 under the term of the
+2-clause BSD open source license
+
+Please cite:
+PHAISTOS - A Markov Chain Monte Carlo Simulation Framework
+
+Boomsma, Frellsen, Harder, Bottaro, Johansson, Tian,
+Stovgaard, Andreetta, Olsson, Valentin, Christensen,
+Borg, Ferkinghoff-Borg, Hamelryck (2012) submitted.
+"""
+
+	label_citation = tk.Label(page, text = text_citation, width = 400)
+        label_citation.pack(padx = 10, pady = 10)
+
+	# Save Button
+        saveButton = tk.Button(self, text = 'Save Config', command = self.save_button)
+        saveButton.pack(side = "right", padx = 10, pady = 10)
+
+        # Exit Button
+        exitButton = tk.Button(self, text = 'Exit', command = self.destroy)
+        exitButton.pack(side = "left", padx = 10, pady = 10)
+
+    def throw_error(self, error_message):
+        return tkMessageBox.askokcancel(title="User error!", message=error_message + "\nContinue anyway?", icon=tkMessageBox.ERROR, default=tkMessageBox.CANCEL)
+
+
+    # Set input from Compensate for move bias radio-buttons
+    def set_implicit_energy(self, tag):
+	if tag == "No":
+            self.settings["implicit-energies"] = True
+        else:
+            self.settings["implicit-energies"] = False
+
+
+    # Set side chain move selection
+    def set_sc_moves(self, tag):
+        self.settings["sc-moves"] = tag
+
+
+    # Set backbone move selection
+    def set_bb_moves(self, tag):
+        self.settings["bb-moves"] = tag
+
+
+    # What happens when the Open file button is clicked
+    def open_pdb_button(self):
+        fname = tkFileDialog.Open(filetypes = [("Input Files", ("*.pdb","*.pqr","*.aa")),("PDB",'*.pdb'),("PQR",'*.pqr'),('AA-SEQ','*.aa')]).show()
+        self.input_structure.delete(0, tk.END)
+        self.settings["input-file"] = fname
+        self.input_structure.insert(0, fname)
+        if os.path.splitext(self.settings["input-file"])[1][1:] not in ["pdb", "PDB", "pqr", "PQR"]:
+	        self.init_from_pdb.deselect()
+	        self.init_from_pdb.configure(state = tk.DISABLED)
+        else:
+	        self.init_from_pdb.configure(state = tk.NORMAL)
+
+
+    # What happens when the Open data-file button is clicked
+    def open_data_button_eo(self):
+        self.data_file.delete(0, tk.END)
+
+        if self.settings['spectroscopy'] == "CamShift 1.35":
+            fname = tkFileDialog.Open(filetypes = [("NMR Star-files", ("*.str","*.cs"))]).show()
+            self.settings["energy-camshift-star-file"] = fname
+
+        elif self.settings['spectroscopy'] == "ProCS":
+            fname = tkFileDialog.Open(filetypes = [("BCS files", ("*.bcs"))]).show()
+            self.settings["energy-procs-bcs-file"] = fname
+
+        self.data_file.insert(0, fname)
+
+    # Set Temperature/START for Simulated Annealing algorithm
+    def set_spec_data_file(self):
+
+        if self.settings['spectroscopy'] == "CamShift 1.35":
+            self.settings["energy-camshift-star-file"] = self.data_file.getvalue() 
+            self.settings["energy-procs-bcs-file"] = ""
+
+        elif self.settings['spectroscopy'] == "ProCS":
+            self.settings["energy-camshift-star-file"] = ""
+            self.settings["energy-procs-bcs-file"] = self.data_file.getvalue() 
+
+    # Set number of iterations from text field
+    def set_iterations(self):
+        self.settings["iterations-per-thread"] = self.input_iterations.getvalue()
+
+
+    # Set number of threads from text field
+    def set_threads(self):
+        self.settings["threads"] = self.input_threads.getvalue()
+    
+
+    # Set input structure file from text field
+    def set_input_structure(self):
+        self.settings["input-file"] = self.input_structure.getvalue()
+#        print self.settings["input-file"]
+
+        if os.path.splitext(self.settings["input-file"])[1][1:] not in ["pdb", "PDB", "pqr", "PQR"]:
+	        self.init_from_pdb.deselect()
+	        self.init_from_pdb.configure(state = tk.DISABLED)
+        else:
+	        self.init_from_pdb.configure(state = tk.NORMAL)
+
+
+    # Set 'project title', and where output files are put
+    def set_title(self):
+        self.settings["title"] = self.sim_title.getvalue()
+        self.settings["output-directory"] =  guistos_utils.DEFAULT_OUT_DIR + "/" + self.settings["title"]
+        self.settings["config-filename"] = self.settings["title"] + ".config"
+
+
+    # Set Temperature for Metropolis-Hastings algorithm
+    def set_mh_temp(self):
+        self.settings["mc-type-mh-temp"] = self.mc_fields[0].getvalue() 
+
+
+    # Set Temperature/MAX for Muninn algorithm
+    def set_mu_temp_max(self):
+        self.settings["mc-type-muninn-temp-max"] = self.mc_fields[0].getvalue() 
+
+
+    # Set Temperature/MIN for Muninn algorithm
+    def set_mu_temp_min(self):
+        self.settings["mc-type-muninn-temp-min"] = self.mc_fields[1].getvalue() 
+
+
+    # Set sampling scheme for Muninn algorithm
+    def set_muninn_type(self, tag):
+        self.settings['mc-type-muninn-scheme'] = tag
+
+
+    # Set Temperature/START for Simulated Annealing algorithm
+    def set_sa_temp_start(self):
+        self.settings["mc-type-sa-temp-start"] = self.mc_fields[0].getvalue() 
+
+
+    # Set Temperature/END for Simulated Annealing algorithm
+    def set_sa_temp_end(self):
+        self.settings["mc-type-sa-temp-end"] = self.mc_fields[1].getvalue() 
+
+
+    # Read checkbox, if user wants to start from PDB file
+    def set_init_from_pdb(self):
+	self.settings["init-from-pdb"] = self.settings["init-from-pdb-py-var"].get()
+
+
+    # Detect force field selection, "None" is currently a deprecated option
+    def select_forcefield(self, tag):
+	if tag == "OPLS-AA/L":
+            self.settings["energy-opls"]    = True
+            self.settings["energy-profasi"] = False
+	elif tag == "PROFASI":
+            self.settings["energy-opls"]    = False
+            self.settings["energy-profasi"] = True
+	elif tag == "None":
+            self.settings["energy-opls"]    = False
+            self.settings["energy-profasi"] = False
+
+
+    # Get settings from spectroscopic data input
+    # Also "grey out" fields, if no model is selected
+    def set_spec(self, tag):
+        self.settings['spectroscopy'] = tag
+        if self.settings['spectroscopy'] == "None":
+            self.settings["energy-camshift"] = False
+            self.settings["energy-procs"] = False
+            self.open_button_eo.configure(state = tk.DISABLED)
+            self.data_file.configure(entry_state=tk.DISABLED, entry_bg='gray' )
+            self.data_file.setvalue("")
+
+        elif self.settings['spectroscopy'] == "CamShift 1.35":
+            self.settings["energy-camshift"] = True
+            self.settings["energy-procs"] = False
+            # Forget ProCS's datafile name
+            self.settings["energy-procs-bcs-file"] = ""
+            self.data_file.setvalue(self.settings["energy-camshift-star-file"])
+            self.open_button_eo.configure(state = tk.NORMAL)
+            self.data_file.configure(entry_state=tk.NORMAL, entry_bg='white')
+
+        elif self.settings['spectroscopy'] == "ProCS":
+            self.settings["energy-camshift"] = False
+            self.settings["energy-procs"] = True
+
+            self.data_file.setvalue("")
+            self.open_button_eo.configure(state = tk.NORMAL)
+            self.data_file.configure(entry_state=tk.NORMAL, entry_bg='white')
+            self.data_file.setvalue(self.settings["energy-procs-bcs-file"])
+            # Forget Camshift's datafile name
+            self.settings["energy-camshift-star-file"] = ""
+
+
+
+    # What happens when user presses Save Button
+    def save_button(self):
+#        print self.settings["input-file"]
+        # Check if input-file exists:
+
+        if not os.path.isfile(self.settings["input-file"]):
+            if self.throw_error("Input file not found:\n" + self.settings["input-file"]) == False:
+            # print "Input file not found:", self.settings["input-file"]
+#               print "User pressed cancled"
+                return
+#       print "input file found check ok"
+        if os.path.splitext(self.settings["input-file"])[1][1:] in ["pdb", "PDB", "pqr", "PQR"]:
+            self.settings["aa-file"] = ""
+            self.settings["pdb-file"] = self.settings["input-file"]
+
+        elif os.path.splitext(self.settings["input-file"])[1][1:] in ["aa", "AA"]:
+            self.settings["aa-file"] = self.settings["input-file"]
+            self.settings["pdb-file"] = ""
+        else:
+            tkMessageBox.showerror(title="User error!", message="Unrecognized file format: " + os.path.splitext(self.settings["input-file"])[1][1:])
+            return
+
+        if self.settings["energy-procs"] == True:
+            if not os.path.isfile(self.settings["energy-procs-bcs-file"]):
+                if self.throw_error(".bcs input file not found:\n" + self.settings["energy-procs-bcs-file"]) == False:
+#               print "BCS file not found:", self.settings["energy-procs-bcs-file"]
+                    return
+
+        if self.settings["energy-camshift"] == True:
+            if not os.path.isfile(self.settings["energy-camshift-star-file"]):
+                if self.throw_error("CamShift .str input file not found:\n" + self.settings["energy-camshift-star-file"]) == False:
+#                print "Camshift file not found:", self.settings["energy-camshift-star-file"]
+                    return
+
+        # if os.path.exists
+        if os.path.exists(self.settings["output-directory"]):
+                if self.throw_error("Output directory already exists:\n" + self.settings["output-directory"]) == False:
+                    return
+#        exfl = asksaveasfilename(filename
+        [('Config file','*.txt'), ('Any file','*.*')]
+        config_file = tkFileDialog.asksaveasfile(title = 'Save config-file', filetypes=[('Config file','*.txt'), ('Any file','*.*')],initialfile=self.settings['title'] + ".txt", defaultextension=".txt" )
+
+        config_text = guistos_utils.collect_output(self.settings)
+
+        config_file.write(config_text)
+        config_file.close()       
+
+#        guistos_utils.cat_config(self.settings)
+
+
+    # What happens when you press buttons in the Monte Carlo field 
+    def set_mc(self, tag):
+        for field in self.mc_fields:
+            field.destroy()
+        if tag == 'Metropolis-Hastings':
+            self.mc_fields = [Pmw.EntryField(self.groupmc.interior(), labelpos = 'w', label_text = 'Temperature [K]:', label_width = 23, entry_width=5, modifiedcommand = self.set_mh_temp)]
+            self.mc_fields[0].setvalue(self.settings["mc-type-mh-temp"])
+            self.mc_fields[0].pack( padx = 20, pady = 13)
+            self.settings["mc-type"] = 'metropolis-hastings'
+        elif tag == 'Muninn':
+            self.mc_fields = [Pmw.EntryField(self.groupmc.interior(), labelpos = 'w', label_text = 'Temperature/MAX [K]:', label_width = 23, entry_width=5, modifiedcommand = self.set_mu_temp_max),
+                              Pmw.EntryField(self.groupmc.interior(), labelpos = 'w', label_text = 'Temperature/MIN [K]:', label_width = 23, entry_width=5, modifiedcommand = self.set_mu_temp_min),
+                              Pmw.RadioSelect(self.groupmc.interior(), buttontype = 'radiobutton', orient = 'vertical', labelpos = 'w', command = self.set_muninn_type, label_text = 'Sampling Scheme:')]
+            self.mc_fields[0].setvalue(self.settings["mc-type-muninn-temp-max"])
+            self.mc_fields[1].setvalue(self.settings["mc-type-muninn-temp-min"])
+            self.mc_fields[2].add('1/k')
+            self.mc_fields[2].add('Multicanonical')
+            self.mc_fields[2].invoke(self.settings['mc-type-muninn-scheme'])
+
+            self.settings["mc-type"] = 'muninn'
+
+            # Add some buttons to the radiobutton RadioSelect.
+            self.mc_fields[0].pack(padx = 15, pady = 13)
+            self.mc_fields[1].pack(padx = 15, pady = 13)
+            self.mc_fields[2].pack(padx = 15, pady = 8)
+
+        elif tag == 'Simulated Annealing':
+            self.mc_fields = [Pmw.EntryField(self.groupmc.interior(), labelpos = 'w', label_text = 'Temperature/START [K]:', label_width = 23, entry_width=5, modifiedcommand = self.set_sa_temp_start ),
+                              Pmw.EntryField(self.groupmc.interior(), labelpos = 'w', label_text = 'Temperature/END [K]:', label_width = 23, entry_width=5, modifiedcommand = self.set_sa_temp_end )]
+            self.mc_fields[0].setvalue(self.settings["mc-type-sa-temp-start"])
+            self.mc_fields[1].setvalue(self.settings["mc-type-sa-temp-end"])
+            for field in self.mc_fields:
+                field.pack(padx = 20, pady = 13)
+
+            self.settings["mc-type"] = 'simulated-annealing'
+
+        elif tag == 'Greedy Optimization':
+            self.mc_fields = []
+
+            self.settings["mc-type"] = 'optimization-greedy'
+
+	Pmw.alignlabels(self.mc_fields)
+
+    # Unimplemented callback 
+#    def callback(self, tag):
+
+#        print 'Button', tag, 'was pressed.'
+
+
+
+
+# Main loop
+if __name__ == "__main__":
+    app = PhaistosApp()
+    app.mainloop()
+
